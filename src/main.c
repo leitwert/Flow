@@ -206,7 +206,7 @@ int main(void)
 	previous_image = image_buffer_8bit_2;
 
 	/* load settings and parameters */
-	global_data_reset_param_defaults();
+	global_data_load_params();
 	global_data_reset();
 
 	/* init led */
