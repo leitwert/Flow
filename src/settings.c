@@ -310,14 +310,14 @@ uint8_t global_data_save_params(){
     {
         return PARAM_UNCHANGED;
     }
-    /* (we could check if erasing is really necessary, but it won't safe much) */
-    uint8_t flash_status;
-    flash_status = flash_erase_sector_address(ADDR_FLASH_GLOBAL_PARAMS);
-    flash_status = flash_write_buffer_float(ADDR_FLASH_GLOBAL_PARAMS, global_data.param, ONBOARD_PARAM_COUNT);
-
+    uint8_t flash_status = FLASH_OK;
+    /* erase the sector */
+    flash_status = flash_status == FLASH_OK ? flash_erase_sector_address(ADDR_FLASH_GLOBAL_PARAMS) : flash_status;
+    /* write all parameters */
+    flash_status = flash_status == FLASH_OK ? flash_write_buffer_float(ADDR_FLASH_GLOBAL_PARAMS, global_data.param, ONBOARD_PARAM_COUNT) : flash_status;
     /* get checksum and write it also to internal flash */
     uint32_t checksum = get_param_checksum();
-    flash_status = flash_write_buffer_uint32(ADDR_FLASH_GLOBAL_PARAMS + 4*ONBOARD_PARAM_COUNT, &checksum, 1);
+    flash_status = flash_status == FLASH_OK ? flash_write_buffer_uint32(ADDR_FLASH_GLOBAL_PARAMS + 4*ONBOARD_PARAM_COUNT, &checksum, 1) : flash_status;
 
     if(flash_status == FLASH_OK)
     {

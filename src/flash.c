@@ -4,9 +4,7 @@
 #include "settings.h"
 #include "stm32f4xx_flash.h"
 
-#define MAX_WRITE_TRIALS  100  /* Number of trials to write to flash */
-
-
+#define MAX_WRITE_TRIALS  3  /* Number of trials to write to flash */
 
 /* Base address of the Flash sectors */
 #define ADDR_FLASH_SECTOR_0     ((uint32_t)0x08000000) /* Base @ of Sector 0, 16 Kbytes   bootloader        */

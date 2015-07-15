@@ -11,7 +11,8 @@ _Min_Stack_Size = 0x400; /* required amount of stack */
 /* Specify the memory areas */
 MEMORY
 {
-  FLASH (rx)      : ORIGIN = 0x08004000, LENGTH = 1008K
+  FLASH (rx)      : ORIGIN = 0x08004000, LENGTH = 880K
+  SETTINGS (rx)   : ORIGIN = 0x0800E000, LENGTH = 128K
   RAM (rwx)       : ORIGIN = 0x20000000, LENGTH = 128K
   CCM (rwx)       : ORIGIN = 0x10000000, LENGTH = 64K
 }
@@ -78,6 +79,12 @@ SECTIONS
 
   /* used by the startup to initialize data */
   _sidata = .;
+
+  .settings :
+  {
+    . = ALIGN(4);
+    __flash_settings_base = .;        /* create a global symbol at settings start */
+  } >SETTINGS
 
   /* Initialized data sections goes into RAM, load LMA copy after code */
   .data : AT ( _sidata )

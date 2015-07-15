@@ -3,7 +3,8 @@
 
 #include <stdint.h>
 
-#define ADDR_FLASH_GLOBAL_PARAMS 0x080E0000
+extern int __flash_settings_base;
+#define ADDR_FLASH_GLOBAL_PARAMS ((uint32_t)(&__flash_settings_base))
 
 #define FLASH_OK 0
 #define FLASH_ERROR_ERASE 1
