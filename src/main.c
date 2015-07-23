@@ -74,6 +74,7 @@ void delay(unsigned msec);
 void buffer_reset(void);
 
 __ALIGN_BEGIN USB_OTG_CORE_HANDLE  USB_OTG_dev __ALIGN_END;
+extern USBD_Class_cb_TypeDef custom_composite_cb;
 
 /* fast image buffers for calculations */
 uint8_t image_buffer_8bit_1[FULL_IMAGE_SIZE] __attribute__((section(".ccm")));
@@ -255,7 +256,7 @@ int main(void)
 	USBD_Init(	&USB_OTG_dev,
 				USB_OTG_FS_CORE_ID,
 				&USR_desc,
-				&USBD_CDC_cb,
+				&custom_composite_cb,
 				&USR_cb);
 
 	/* init mavlink */

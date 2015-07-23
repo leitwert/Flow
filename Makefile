@@ -33,6 +33,7 @@ SRCS = 		src/main.c \
 			src/usbd_cdc_vcp.c \
 			src/usbd_desc.c \
 			src/usbd_usr.c \
+			src/usb_composite.c \
 			src/i2c.c \
 			src/reset.c \
 			src/sonar_mode_filter.c
