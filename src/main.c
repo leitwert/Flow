@@ -79,6 +79,7 @@ extern USBD_Class_cb_TypeDef custom_composite_cb;
 /* fast image buffers for calculations */
 uint8_t image_buffer_8bit_1[FULL_IMAGE_SIZE] __attribute__((section(".ccm")));
 uint8_t image_buffer_8bit_2[FULL_IMAGE_SIZE] __attribute__((section(".ccm")));
+uint8_t image_buf_send[64*64];
 uint8_t buffer_reset_needed;
 
 /* boot time in milliseconds ticks */
@@ -222,6 +223,10 @@ void delay(unsigned msec)
 
 void buffer_reset(void) {
 	buffer_reset_needed = 1;
+}
+
+void start_send_image(uint8_t* data, unsigned size) {
+	DCD_EP_Tx(&USB_OTG_dev, IMAGE_IN_EP, data, size);
 }
 
 /**
@@ -644,30 +649,9 @@ int main(void)
 		/*  transmit raw 8-bit image */
 		if (global_data.param[PARAM_USB_SEND_VIDEO] && send_image_now)
 		{
-			/* get size of image to send */
-			uint16_t image_size_send;
-			uint16_t image_width_send;
-			uint16_t image_height_send;
-
-			image_size_send = image_size;
-			image_width_send = global_data.param[PARAM_IMAGE_WIDTH];
-			image_height_send = global_data.param[PARAM_IMAGE_HEIGHT];
-
-			mavlink_msg_data_transmission_handshake_send(
-					MAVLINK_COMM_2,
-					MAVLINK_DATA_STREAM_IMG_RAW8U,
-					image_size_send,
-					image_width_send,
-					image_height_send,
-					image_size_send / MAVLINK_MSG_ENCAPSULATED_DATA_FIELD_DATA_LEN + 1,
-					MAVLINK_MSG_ENCAPSULATED_DATA_FIELD_DATA_LEN,
-					100);
 			LEDToggle(LED_COM);
-			uint16_t frame = 0;
-			for (frame = 0; frame < image_size_send / MAVLINK_MSG_ENCAPSULATED_DATA_FIELD_DATA_LEN + 1; frame++)
-			{
-				mavlink_msg_encapsulated_data_send(MAVLINK_COMM_2, frame, &((uint8_t *) current_image)[frame * MAVLINK_MSG_ENCAPSULATED_DATA_FIELD_DATA_LEN]);
-			}
+			memcpy(image_buf_send, current_image, 64*64);
+			start_send_image(image_buf_send, 64*64);
 
 			send_image_now = false;
 		}

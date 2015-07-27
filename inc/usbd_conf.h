@@ -31,8 +31,8 @@
 #include "usb_conf.h"
 
 #define USBD_CFG_MAX_NUM                1
-#define USBD_ITF_MAX_NUM                2
-#define USB_MAX_STR_DESC_SIZ            255 
+#define USBD_ITF_MAX_NUM                3
+#define USB_MAX_STR_DESC_SIZ            255
 
 #define CDC_IN_EP                       0x81  /* EP1 for data IN */
 #define CDC_OUT_EP                      0x01  /* EP1 for data OUT */
