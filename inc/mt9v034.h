@@ -128,6 +128,8 @@
 #define FULL_IMAGE_ROW_SIZE (188)
 #define FULL_IMAGE_COLUMN_SIZE (120)
 
+#define USB_IMAGE_PIXELS 320
+
 /* Functions */
 
 /**

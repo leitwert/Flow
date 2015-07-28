@@ -68,7 +68,7 @@ void DMA2_Stream1_IRQHandler(void);
 void dcmi_dma_enable(void);
 void dcmi_dma_disable(void);
 void dma_reconfigure(void);
-void dcmi_restart_calibration_routine(void);
+void capture_one_frame(void);
 void dma_swap_buffers(void);
 
 uint32_t get_time_between_images(void);

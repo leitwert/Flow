@@ -5,11 +5,9 @@ import matplotlib.pyplot as plt
 dev = usb.core.find(idVendor=0x26ac, idProduct=0x0015)
 endpoint = dev[0][(2,0)][0]
 
-SIZE = 64
+SIZE = 320
 image = np.zeros((SIZE, SIZE), dtype='uint8')
-imshow = plt.imshow(image, cmap=plt.cm.gray)
-imshow.norm.vmin = 0
-imshow.norm.vmax = 255
+imshow = plt.imshow(image, cmap=plt.cm.gray, vmin=0, vmax=255)
 plt.ion()
 plt.show()
 

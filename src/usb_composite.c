@@ -9,7 +9,7 @@
 
 typedef struct ConfigDesc {
   USB_ConfigurationDescriptor Config;
-  
+
   USB_InterfaceDescriptor CDC_control_interface;
   CDC_FunctionalHeaderDescriptor CDC_functional_header;
   CDC_FunctionalACMDescriptor CDC_functional_ACM;
@@ -19,7 +19,7 @@ typedef struct ConfigDesc {
   USB_InterfaceDescriptor CDC_data_interface;
   USB_EndpointDescriptor CDC_out_endpoint;
   USB_EndpointDescriptor CDC_in_endpoint;
- 
+
   USB_InterfaceDescriptor ImageInterface;
   USB_EndpointDescriptor ImageInEndpoint;
 }  __attribute__((packed)) ConfigDesc;
@@ -100,7 +100,7 @@ const ConfigDesc configuration_descriptor = {
     .wMaxPacketSize = CDC_DATA_MAX_PACKET_SIZE,
     .bInterval = 0x0
   },
-  
+
   .ImageInterface = {
     .bLength = sizeof(USB_InterfaceDescriptor),
     .bDescriptorType = USB_DTYPE_Interface,

@@ -46,10 +46,10 @@
  #define IMAGE_IN_PACKET_SIZE           64
 
 /* Number of frames between IN transfers */
-#define CDC_IN_FRAME_INTERVAL          40 //5
+#define CDC_IN_FRAME_INTERVAL          5
 
 /* Total size of IN buffer: APP_RX_DATA_SIZE*8/MAX_BAUDARATE*1000 should be > CDC_IN_FRAME_INTERVAL */
-#define APP_RX_DATA_SIZE               32768 //2048
+#define APP_RX_DATA_SIZE               4096
 
 #define APP_FOPS                        VCP_fops
 

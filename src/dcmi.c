@@ -66,9 +66,7 @@ volatile uint8_t calibration_mem0;
 volatile uint8_t calibration_mem1;
 
 /* image buffers */
-uint8_t dcmi_image_buffer_8bit_1[FULL_IMAGE_SIZE];
-uint8_t dcmi_image_buffer_8bit_2[FULL_IMAGE_SIZE];
-uint8_t dcmi_image_buffer_8bit_3[FULL_IMAGE_SIZE];
+uint8_t usb_image_buffer[USB_IMAGE_PIXELS * USB_IMAGE_PIXELS];
 
 uint32_t time_between_images;
 
@@ -83,7 +81,7 @@ void enable_image_capture(void)
 {
 	dcmi_clock_init();
 	dcmi_hw_init();
-	dcmi_dma_init(global_data.param[PARAM_IMAGE_WIDTH] * global_data.param[PARAM_IMAGE_HEIGHT]);
+	dcmi_dma_init(USB_IMAGE_PIXELS * USB_IMAGE_PIXELS);
 	mt9v034_context_configuration();
 	dcmi_dma_enable();
 }
@@ -94,12 +92,7 @@ void enable_image_capture(void)
 void dma_reconfigure(void)
 {
 	dcmi_dma_disable();
-
-	if(global_data.param[PARAM_VIDEO_ONLY])
-		dcmi_dma_init(FULL_IMAGE_SIZE);
-	else
-		dcmi_dma_init(global_data.param[PARAM_IMAGE_WIDTH] * global_data.param[PARAM_IMAGE_HEIGHT]);
-
+	dcmi_dma_init(USB_IMAGE_PIXELS * USB_IMAGE_PIXELS);
 	dcmi_dma_enable();
 }
 
@@ -107,12 +100,11 @@ void dma_reconfigure(void)
  * @brief Calibration image collection routine restart
  */
 
-void dcmi_restart_calibration_routine(void)
+void capture_one_frame(void)
 {
-	/* wait until we have all 4 parts of image */
-	while(frame_counter < 4){}
 	frame_counter = 0;
 	dcmi_dma_enable();
+	while(frame_counter < 1) {}
 }
 
 /**
@@ -139,17 +131,7 @@ void DMA2_Stream1_IRQHandler(void)
 		DMA_ClearITPendingBit(DMA2_Stream1, DMA_IT_TCIF1);
 		frame_counter++;
 
-		if(global_data.param[PARAM_VIDEO_ONLY])
-		{
-			if (frame_counter >= 4)
-			{
-				dcmi_dma_disable();
-				calibration_used = DMA_GetCurrentMemoryTarget(DMA2_Stream1);
-				calibration_unused = dcmi_image_buffer_unused;
-				calibration_mem0 = dcmi_image_buffer_memory0;
-				calibration_mem1 = dcmi_image_buffer_memory1;
-			}
-		}
+		dcmi_dma_disable();
 
 		return;
 	}
@@ -163,62 +145,6 @@ void DMA2_Stream1_IRQHandler(void)
 	{
 		DMA_ClearITPendingBit(DMA2_Stream1, DMA_IT_HTIF1);
 	}
-
-	dma_swap_buffers();
-}
-
-/**
- * @brief Swap DMA image buffer addresses
- */
-void dma_swap_buffers(void)
-{
-	/* check which buffer is in use */
-	if (DMA_GetCurrentMemoryTarget(DMA2_Stream1))
-	{
-		/* swap dcmi image buffer */
-		if (dcmi_image_buffer_unused == 1)
-			DMA_MemoryTargetConfig(DMA2_Stream1, (uint32_t) dcmi_image_buffer_8bit_1, DMA_Memory_0);
-		else if (dcmi_image_buffer_unused == 2)
-			DMA_MemoryTargetConfig(DMA2_Stream1, (uint32_t) dcmi_image_buffer_8bit_2, DMA_Memory_0);
-		else
-			DMA_MemoryTargetConfig(DMA2_Stream1, (uint32_t) dcmi_image_buffer_8bit_3, DMA_Memory_0);
-
-		int tmp_buffer = dcmi_image_buffer_memory0;
-		dcmi_image_buffer_memory0 = dcmi_image_buffer_unused;
-		dcmi_image_buffer_unused = tmp_buffer;
-	}
-	else
-	{
-		/* swap dcmi image buffer */
-		if (dcmi_image_buffer_unused == 1)
-			DMA_MemoryTargetConfig(DMA2_Stream1, (uint32_t) dcmi_image_buffer_8bit_1, DMA_Memory_1);
-		else if (dcmi_image_buffer_unused == 2)
-			DMA_MemoryTargetConfig(DMA2_Stream1, (uint32_t) dcmi_image_buffer_8bit_2, DMA_Memory_1);
-		else
-			DMA_MemoryTargetConfig(DMA2_Stream1, (uint32_t) dcmi_image_buffer_8bit_3, DMA_Memory_1);
-
-		int tmp_buffer = dcmi_image_buffer_memory1;
-		dcmi_image_buffer_memory1 = dcmi_image_buffer_unused;
-		dcmi_image_buffer_unused = tmp_buffer;
-	}
-
-	/* set next time_between_images */
-	cycle_time = get_boot_time_us() - time_last_frame;
-	time_last_frame = get_boot_time_us();
-
-	if(image_counter) // image was not fetched jet
-	{
-		time_between_next_images = time_between_next_images + cycle_time;
-	}
-	else
-	{
-		time_between_next_images = cycle_time;
-	}
-
-	/* set new image true and increment frame counter*/
-	image_counter += 1;
-
-	return;
 }
 
 uint32_t get_time_between_images(void){
@@ -229,128 +155,6 @@ uint32_t get_frame_counter(void){
 	return frame_counter;
 }
 
-/**
- * @brief Copy image to fast RAM address
- *
- * @param current_image Current image buffer
- * @param previous_image Previous image buffer
- * @param image_size Image size of the image to copy
- * @param image_step Image to wait for (if 1 no waiting)
- */
-void dma_copy_image_buffers(uint8_t ** current_image, uint8_t ** previous_image, uint16_t image_size, uint8_t image_step){
-
-	/* swap image buffers */
-	uint8_t * tmp_image = *current_image;
-	*current_image = *previous_image;
-	*previous_image = tmp_image;
-
-	/* wait for new image if needed */
-	while(image_counter < image_step) {}
-	image_counter = 0;
-
-	/* time between images */
-	time_between_images = time_between_next_images;
-
-	/* copy image */
-	if (dcmi_image_buffer_unused == 1)
-	{
-		for (uint16_t pixel = 0; pixel < image_size; pixel++)
-			(*current_image)[pixel] = (uint8_t)(dcmi_image_buffer_8bit_1[pixel]);
-	}
-	else if (dcmi_image_buffer_unused == 2)
-	{
-		for (uint16_t pixel = 0; pixel < image_size; pixel++)
-			(*current_image)[pixel] = (uint8_t)(dcmi_image_buffer_8bit_2[pixel]);
-	}
-	else
-	{
-		for (uint16_t pixel = 0; pixel < image_size; pixel++)
-			(*current_image)[pixel] = (uint8_t)(dcmi_image_buffer_8bit_3[pixel]);
-	}
-}
-
-/**
- * @brief Send calibration image with MAVLINK over USB
- *
- * @param image_buffer_fast_1 Image buffer in fast RAM
- * @param image_buffer_fast_2 Image buffer in fast RAM
- */
-void send_calibration_image(uint8_t ** image_buffer_fast_1, uint8_t ** image_buffer_fast_2) {
-
-	/*  transmit raw 8-bit image */
-	/* TODO image is too large for this transmission protocol (too much packets), but it works */
-	mavlink_msg_data_transmission_handshake_send(
-			MAVLINK_COMM_2,
-			MAVLINK_DATA_STREAM_IMG_RAW8U,
-			FULL_IMAGE_SIZE * 4,
-			FULL_IMAGE_ROW_SIZE * 2,
-			FULL_IMAGE_COLUMN_SIZE * 2,
-			FULL_IMAGE_SIZE * 4 / MAVLINK_MSG_ENCAPSULATED_DATA_FIELD_DATA_LEN + 1,
-			MAVLINK_MSG_ENCAPSULATED_DATA_FIELD_DATA_LEN,
-			100);
-
-	uint16_t frame = 0;
-	uint8_t image = 0;
-	uint8_t frame_buffer[MAVLINK_MSG_ENCAPSULATED_DATA_FIELD_DATA_LEN];
-
-	for (int i = 0; i < FULL_IMAGE_SIZE * 4; i++)
-	{
-
-		if (i % FULL_IMAGE_SIZE == 0 && i != 0)
-		{
-			image++;
-		}
-
-		if (i % MAVLINK_MSG_ENCAPSULATED_DATA_FIELD_DATA_LEN == 0 && i != 0)
-		{
-			mavlink_msg_encapsulated_data_send(MAVLINK_COMM_2, frame, frame_buffer);
-			frame++;
-			delay(2);
-		}
-
-		if (image == 0 )
-		{
-			frame_buffer[i % MAVLINK_MSG_ENCAPSULATED_DATA_FIELD_DATA_LEN] = (uint8_t)(*image_buffer_fast_1)[i % FULL_IMAGE_SIZE];
-		}
-		else if (image == 1 )
-		{
-			frame_buffer[i % MAVLINK_MSG_ENCAPSULATED_DATA_FIELD_DATA_LEN] = (uint8_t)(*image_buffer_fast_2)[i % FULL_IMAGE_SIZE];
-		}
-		else if (image == 2)
-		{
-			if (calibration_unused == 1)
-				frame_buffer[i % MAVLINK_MSG_ENCAPSULATED_DATA_FIELD_DATA_LEN] = dcmi_image_buffer_8bit_1[i % FULL_IMAGE_SIZE];
-			else if (calibration_unused == 2)
-				frame_buffer[i % MAVLINK_MSG_ENCAPSULATED_DATA_FIELD_DATA_LEN] = dcmi_image_buffer_8bit_2[i % FULL_IMAGE_SIZE];
-			else
-				frame_buffer[i % MAVLINK_MSG_ENCAPSULATED_DATA_FIELD_DATA_LEN] = dcmi_image_buffer_8bit_3[i % FULL_IMAGE_SIZE];
-		}
-		else
-		{
-			if (calibration_used)
-			{
-				if (calibration_mem0 == 1)
-					frame_buffer[i % MAVLINK_MSG_ENCAPSULATED_DATA_FIELD_DATA_LEN] = dcmi_image_buffer_8bit_1[i % FULL_IMAGE_SIZE];
-				else if (calibration_mem0 == 2)
-					frame_buffer[i % MAVLINK_MSG_ENCAPSULATED_DATA_FIELD_DATA_LEN] = dcmi_image_buffer_8bit_2[i % FULL_IMAGE_SIZE];
-				else
-					frame_buffer[i % MAVLINK_MSG_ENCAPSULATED_DATA_FIELD_DATA_LEN] = dcmi_image_buffer_8bit_3[i % FULL_IMAGE_SIZE];
-			}
-			else
-			{
-				if (calibration_mem1 == 1)
-					frame_buffer[i % MAVLINK_MSG_ENCAPSULATED_DATA_FIELD_DATA_LEN] = dcmi_image_buffer_8bit_1[i % FULL_IMAGE_SIZE];
-				else if (calibration_mem1 == 2)
-					frame_buffer[i % MAVLINK_MSG_ENCAPSULATED_DATA_FIELD_DATA_LEN] = dcmi_image_buffer_8bit_2[i % FULL_IMAGE_SIZE];
-				else
-					frame_buffer[i % MAVLINK_MSG_ENCAPSULATED_DATA_FIELD_DATA_LEN] = dcmi_image_buffer_8bit_3[i % FULL_IMAGE_SIZE];
-			}
-		}
-	}
-
-	mavlink_msg_encapsulated_data_send(MAVLINK_COMM_2, frame, frame_buffer);
-
-}
 
 /**
  * @brief Initialize/Enable DCMI Interrupt
@@ -470,15 +274,6 @@ void dcmi_clock_init()
  */
 void dcmi_hw_init(void)
 {
-	uint16_t image_size = global_data.param[PARAM_IMAGE_WIDTH] * global_data.param[PARAM_IMAGE_HEIGHT];
-
-	/* Reset image buffers */
-	for (int i = 0; i < image_size; i++) {
-		dcmi_image_buffer_8bit_1 [i] = 0;
-		dcmi_image_buffer_8bit_2 [i] = 0;
-		dcmi_image_buffer_8bit_3 [i] = 0;
-	}
-
 	GPIO_InitTypeDef GPIO_InitStructure;
 	I2C_InitTypeDef I2C_InitStruct;
 
@@ -604,7 +399,7 @@ void dcmi_dma_init(uint32_t buffer_size)
 
 	DMA_InitStructure.DMA_Channel = DMA_Channel_1;
 	DMA_InitStructure.DMA_PeripheralBaseAddr = DCMI_DR_ADDRESS;
-	DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t) dcmi_image_buffer_8bit_1;
+	DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t) usb_image_buffer;
 	DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralToMemory;
 	DMA_InitStructure.DMA_BufferSize = buffer_size / 4; // buffer size in date unit (word)
 	DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
@@ -618,7 +413,7 @@ void dcmi_dma_init(uint32_t buffer_size)
 	DMA_InitStructure.DMA_MemoryBurst = DMA_MemoryBurst_Single;
 	DMA_InitStructure.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
 
-	DMA_DoubleBufferModeConfig(DMA2_Stream1,(uint32_t) dcmi_image_buffer_8bit_2, DMA_Memory_0);
+	//DMA_DoubleBufferModeConfig(DMA2_Stream1,(uint32_t) dcmi_image_buffer_8bit_2, DMA_Memory_0);
 	DMA_DoubleBufferModeCmd(DMA2_Stream1,ENABLE);
 
 	/* DCMI configuration */
