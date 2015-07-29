@@ -17,4 +17,4 @@ while True:
     data = endpoint.read(SIZE*SIZE)
     image = np.frombuffer(data, dtype='uint8').reshape(SIZE, SIZE)
     imshow.set_data(image)
-    plt.draw()
+    plt.pause(1e-9)
