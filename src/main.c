@@ -79,7 +79,6 @@ extern USBD_Class_cb_TypeDef custom_composite_cb;
 /* fast image buffers for calculations */
 uint8_t image_buffer_8bit_1[FULL_IMAGE_SIZE] __attribute__((section(".ccm")));
 uint8_t image_buffer_8bit_2[FULL_IMAGE_SIZE] __attribute__((section(".ccm")));
-uint8_t image_buf_send[64*64];
 uint8_t buffer_reset_needed;
 
 /* boot time in milliseconds ticks */
@@ -226,16 +225,39 @@ void buffer_reset(void) {
 	buffer_reset_needed = 1;
 }
 
-void start_send_image(uint8_t* data, unsigned size) {
+#define USB_IMAGE_PIXELS 64
+uint8_t usb_image_buffer[USB_IMAGE_PIXELS * USB_IMAGE_PIXELS];
+unsigned usb_image_pos = 0;
+#define MAX_TRANSFER (1023*64)
+
+void send_image_step() {
+	unsigned size = USB_IMAGE_PIXELS*USB_IMAGE_PIXELS - usb_image_pos;
+	if (size > MAX_TRANSFER) size = MAX_TRANSFER;
+
+	DCD_EP_Tx(&USB_OTG_dev, IMAGE_IN_EP, &usb_image_buffer[usb_image_pos], size);
+	if (size == 0 || size % 64 != 0) {
+		// We sent a short packet at the end of the transfer. When it completes, we're done.
+		usb_image_pos = -1;
+	} else {
+		usb_image_pos += size;
+	}
+}
+
+void start_send_image() {
 	LEDOn(LED_COM);
 	usb_image_transfer_active = true;
+	usb_image_pos = 0;
 	DCD_EP_Flush(&USB_OTG_dev, IMAGE_IN_EP);
-	DCD_EP_Tx(&USB_OTG_dev, IMAGE_IN_EP, data, size);
+	send_image_step();
 }
 
 void send_image_completed(void) {
-	usb_image_transfer_active = false;
-	LEDOff(LED_COM);
+	if (usb_image_pos != -1) {
+		send_image_step();
+	} else {
+		usb_image_transfer_active = false;
+		LEDOff(LED_COM);
+	}
 }
 
 /**
@@ -658,8 +680,8 @@ int main(void)
 		/*  transmit raw 8-bit image */
 		if (global_data.param[PARAM_USB_SEND_VIDEO] && send_image_now && !usb_image_transfer_active)
 		{
-			memcpy(image_buf_send, current_image, 64*64);
-			start_send_image(image_buf_send, 64*64);
+			memcpy(usb_image_buffer, current_image, 64*64);;
+			start_send_image();
 			send_image_now = false;
 		}
 		else if (!global_data.param[PARAM_USB_SEND_VIDEO])

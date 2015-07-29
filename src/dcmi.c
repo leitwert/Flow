@@ -106,6 +106,7 @@ void dma_reconfigure(void)
 /**
  * @brief Calibration image collection routine restart
  */
+
 void dcmi_restart_calibration_routine(void)
 {
 	/* wait until we have all 4 parts of image */
@@ -574,7 +575,7 @@ void dcmi_hw_init(void)
   *
   * @param  buffer_size Buffer size in bytes
   */
-void dcmi_dma_init(uint16_t buffer_size)
+void dcmi_dma_init(uint32_t buffer_size)
 {
 	reset_frame_counter();
 
