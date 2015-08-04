@@ -114,6 +114,7 @@ bool receive_now = true;
 bool send_params_now = true;
 bool send_image_now = true;
 bool send_lpos_now = true;
+volatile bool usb_image_transfer_active = false;
 
 /* local position estimate without orientation, useful for unit testing w/o FMU */
 struct lpos_t {
@@ -226,7 +227,15 @@ void buffer_reset(void) {
 }
 
 void start_send_image(uint8_t* data, unsigned size) {
+	LEDOn(LED_COM);
+	usb_image_transfer_active = true;
+	DCD_EP_Flush(&USB_OTG_dev, IMAGE_IN_EP);
 	DCD_EP_Tx(&USB_OTG_dev, IMAGE_IN_EP, data, size);
+}
+
+void send_image_completed(void) {
+	usb_image_transfer_active = false;
+	LEDOff(LED_COM);
 }
 
 /**
@@ -647,12 +656,10 @@ int main(void)
 		}
 
 		/*  transmit raw 8-bit image */
-		if (global_data.param[PARAM_USB_SEND_VIDEO] && send_image_now)
+		if (global_data.param[PARAM_USB_SEND_VIDEO] && send_image_now && !usb_image_transfer_active)
 		{
-			LEDToggle(LED_COM);
 			memcpy(image_buf_send, current_image, 64*64);
 			start_send_image(image_buf_send, 64*64);
-
 			send_image_now = false;
 		}
 		else if (!global_data.param[PARAM_USB_SEND_VIDEO])

@@ -165,10 +165,13 @@ static uint8_t usb_EP0_RxReady  (void *pdev) {
   return USBD_CDC_cb.EP0_RxReady(pdev);
 }
 
+void send_image_completed(void);
+
 static uint8_t usb_DataIn      (void *pdev, uint8_t epnum) {
   if (epnum == (CDC_IN_EP & 0x7f) || epnum == (CDC_CMD_EP & 0x7f)) {
     return USBD_CDC_cb.DataIn(pdev, epnum);
-  } else if (epnum == IMAGE_IN_EP) {
+  } else if (epnum == (IMAGE_IN_EP & 0x7f)) {
+    send_image_completed();
   }
   return USBD_OK;
 }
