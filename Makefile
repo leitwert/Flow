@@ -37,6 +37,7 @@ SRCS = 		src/main.c \
 			src/usbd_cdc_vcp.c \
 			src/usbd_desc.c \
 			src/usbd_usr.c \
+			src/usb_composite.c \
 			src/i2c.c \
 			src/reset.c \
 			src/sonar_mode_filter.c
@@ -63,7 +64,7 @@ CFLAGS		 = -mthumb -mcpu=cortex-m4 -mfloat-abi=hard -mfpu=fpv4-sp-d16 \
 			-O3 \
 			-ggdb \
 			-std=gnu99 \
-			-Wall -Werror \
+			-Wall -Werror -Wno-unused-variable\
 			-MMD \
 			-Iinc \
 			-Ilib \

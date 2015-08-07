@@ -74,12 +74,25 @@
 
 
 __ALIGN_BEGIN USB_OTG_CORE_HANDLE  USB_OTG_dev __ALIGN_END;
+extern USBD_Class_cb_TypeDef custom_composite_cb;
+
+
+#define USB_IMAGE_PIXELS (288)
+
+#define FLOW_IMAGE_SIZE (64)
+
 
 /* timer constants */
 #define SONAR_POLL_MS	 	100	/* steps in milliseconds ticks */
 #define SYSTEM_STATE_MS		1000/* steps in milliseconds ticks */
 #define PARAMS_MS			100	/* steps in milliseconds ticks */
 #define LPOS_TIMER_COUNT 	100	/* steps in milliseconds ticks */
+
+volatile bool usb_image_transfer_active = false;
+
+static volatile bool snap_capture_done = false;
+static volatile bool snap_capture_success = false;
+static bool snap_ready = true;
 
 /* local position estimate without orientation, useful for unit testing w/o FMU */
 struct lpos_t {
@@ -94,10 +107,18 @@ struct lpos_t {
 static camera_ctx cam_ctx;
 static camera_img_param img_stream_param;
 
-uint8_t snapshot_buffer_mem[128 * 128];
+uint8_t snapshot_buffer_mem[USB_IMAGE_PIXELS * USB_IMAGE_PIXELS];
 
 static camera_image_buffer snapshot_buffer;
-	
+
+static uint8_t image_buffer_8bit_1[FLOW_IMAGE_SIZE * FLOW_IMAGE_SIZE] __attribute__((section(".ccm")));
+static uint8_t image_buffer_8bit_2[FLOW_IMAGE_SIZE * FLOW_IMAGE_SIZE] __attribute__((section(".ccm")));
+static uint8_t image_buffer_8bit_3[FLOW_IMAGE_SIZE * FLOW_IMAGE_SIZE] __attribute__((section(".ccm")));
+static uint8_t image_buffer_8bit_4[FLOW_IMAGE_SIZE * FLOW_IMAGE_SIZE] __attribute__((section(".ccm")));
+static uint8_t image_buffer_8bit_5[FLOW_IMAGE_SIZE * FLOW_IMAGE_SIZE] __attribute__((section(".ccm")));
+
+static flow_klt_image flow_klt_images[2] __attribute__((section(".ccm")));
+
 void sonar_update_fn(void) {
 	sonar_trigger();
 }
@@ -167,20 +188,16 @@ void send_params_fn(void) {
 	camera_img_stream_schedule_param_change(&cam_ctx, &img_stream_param);
 }*/
 
-static volatile bool snap_capture_done = false;
-static volatile bool snap_capture_success = false;
-static bool snap_ready = true;
-
 void snapshot_captured_fn(bool success) {
 	snap_capture_done = true;
 	snap_capture_success = success;
 }
 
 void take_snapshot_fn(void) {
-	if (global_data.param[PARAM_USB_SEND_VIDEO] && global_data.param[PARAM_VIDEO_ONLY] && snap_ready) {
+	if (global_data.param[PARAM_USB_SEND_VIDEO] && global_data.param[PARAM_VIDEO_ONLY] && snap_ready && !usb_image_transfer_active) {
 		static camera_img_param snapshot_param;
-		snapshot_param.size.x = 128;
-		snapshot_param.size.y = 128;
+		snapshot_param.size.x = USB_IMAGE_PIXELS;
+		snapshot_param.size.y = USB_IMAGE_PIXELS;
 		snapshot_param.binning = 1;
 		if (camera_snapshot_schedule(&cam_ctx, &snapshot_param, &snapshot_buffer, snapshot_captured_fn)) {
 			snap_ready = false;
@@ -192,19 +209,40 @@ void notify_changed_camera_parameters() {
 	camera_reconfigure_general(&cam_ctx);
 }
 
-#define FLOW_IMAGE_SIZE (64)
+int usb_image_pos = -1;
+#define MAX_TRANSFER (1023*64)
 
-static uint8_t image_buffer_8bit_1[FLOW_IMAGE_SIZE * FLOW_IMAGE_SIZE] __attribute__((section(".ccm")));
-static uint8_t image_buffer_8bit_2[FLOW_IMAGE_SIZE * FLOW_IMAGE_SIZE] __attribute__((section(".ccm")));
-static uint8_t image_buffer_8bit_3[FLOW_IMAGE_SIZE * FLOW_IMAGE_SIZE] __attribute__((section(".ccm")));
-static uint8_t image_buffer_8bit_4[FLOW_IMAGE_SIZE * FLOW_IMAGE_SIZE] __attribute__((section(".ccm")));
-static uint8_t image_buffer_8bit_5[FLOW_IMAGE_SIZE * FLOW_IMAGE_SIZE] __attribute__((section(".ccm")));
+void send_image_step() {
+	uint8_t *img = snapshot_buffer.buffer;
+	unsigned full_size = (unsigned)snapshot_buffer.param.p.size.x * (unsigned)snapshot_buffer.param.p.size.y;
+	unsigned size = full_size - usb_image_pos;
+	if (size > MAX_TRANSFER) size = MAX_TRANSFER;
 
-static flow_klt_image flow_klt_images[2] __attribute__((section(".ccm")));
+	DCD_EP_Tx(&USB_OTG_dev, IMAGE_IN_EP, &img[usb_image_pos], size);
+	usb_image_pos += size;
+	if (usb_image_pos >= full_size) {
+		// We sent the last packet at the end of the transfer. When it completes, we're done.
+		usb_image_pos = -1;
+	}
+}
 
-/**
-  * @brief  Main function.
-  */
+void start_send_image() {
+	LEDOn(LED_COM);
+	usb_image_transfer_active = true;
+	usb_image_pos = 0;
+	DCD_EP_Flush(&USB_OTG_dev, IMAGE_IN_EP);
+	send_image_step();
+}
+
+void send_image_completed(void) {
+	if (usb_image_pos != -1) {
+		send_image_step();
+	} else {
+		usb_image_transfer_active = false;
+		LEDOff(LED_COM);
+	}
+}
+
 int main(void)
 {
 	snapshot_buffer = BuildCameraImageBuffer(snapshot_buffer_mem);
@@ -231,7 +269,7 @@ int main(void)
 	USBD_Init(	&USB_OTG_dev,
 				USB_OTG_FS_CORE_ID,
 				&USR_desc,
-				&USBD_CDC_cb,
+				&custom_composite_cb,
 				&USR_cb);
 
 	/* init mavlink */
@@ -303,8 +341,7 @@ int main(void)
 			snap_ready = true;
 			if (snap_capture_success) {
 				/* send the snapshot! */
-				LEDToggle(LED_COM);
-				mavlink_send_image(&snapshot_buffer);
+				start_send_image();
 			}
 		}
 
@@ -477,6 +514,7 @@ int main(void)
         /* serial mavlink  + usb mavlink output throttled */
 		if (counter % (uint32_t)global_data.param[PARAM_FLOW_SERIAL_THROTTLE_FACTOR] == 0)//throttling factor
 		{
+			LEDToggle(LED_ACT);
 			float fps = 0;
 			float fps_skip = 0;
 			if (fps_counter + fps_skipped_counter > 100) {
