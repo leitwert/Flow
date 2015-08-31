@@ -43,6 +43,8 @@
 #include <inttypes.h>
 #include <stdbool.h>
 
+#include "flow.h"
+
 #define I2C1_OWNADDRESS_1_BASE 0x42 //7bit base address
 /**
  * @brief  Configures I2C1 for communication as a slave (default behaviour for STM32F)
@@ -50,7 +52,7 @@
 
 void i2c_init(void);
 void update_TX_buffer(float dt, float x_rate, float y_rate, float z_rate, int16_t gyro_temp,
-					  uint8_t qual, float pixel_flow_x, float pixel_flow_y, float rad_per_pixel,
+					  uint8_t qual, float pixel_flow_x, float pixel_flow_y, const flow_capability *flow_cap, float rad_per_pixel,
 					  bool distance_valid, float ground_distance, uint32_t distance_age);
 char i2c_get_ownaddress1(void);
 #endif /* I2C_H_ */

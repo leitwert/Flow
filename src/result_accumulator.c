@@ -39,6 +39,7 @@
 #include <math.h>
 
 #include "result_accumulator.h"
+#include "flow.h"
 
 void result_accumulator_init(result_accumulator_ctx *ctx)
 {
@@ -50,7 +51,7 @@ void result_accumulator_init(result_accumulator_ctx *ctx)
 }
 
 void result_accumulator_feed(result_accumulator_ctx *ctx, float dt, float x_rate, float y_rate, float z_rate, int16_t gyro_temp, 
-							 uint8_t qual, float pixel_flow_x, float pixel_flow_y, float rad_per_pixel,
+							 uint8_t qual, float pixel_flow_x, float pixel_flow_y, const flow_capability *flow_cap, float rad_per_pixel,
 							 bool distance_valid, float ground_distance, uint32_t distance_age)
 {
 	/* update last value in struct */
@@ -62,6 +63,19 @@ void result_accumulator_feed(result_accumulator_ctx *ctx, float dt, float x_rate
 	ctx->last.qual   = qual;
 	ctx->last.pixel_flow_x = pixel_flow_x;
 	ctx->last.pixel_flow_y = pixel_flow_y;
+	ctx->last.flow_cap     = *flow_cap;
+	/* convert the algorithms capability into a velocity in rad / s: */
+	ctx->last.flow_cap_mvx_rad = ctx->last.flow_cap.max_y_px_frame * rad_per_pixel / dt;
+	ctx->last.flow_cap_mvy_rad = ctx->last.flow_cap.max_x_px_frame * rad_per_pixel / dt;
+	/* Convert the flow from pixels to rad:
+	 * This is done with a linear relationship because the involved angles are low.
+	 * 
+	 * Calculation for maximum possible error: (for an assumed drone configuration)
+	 * With a 10Hz accumulation period and 5m/s at 1m distance the real speed in rad is 0.463rad per accumulation period.
+	 * Each frame (taken at 400Hz) measures a distance of 4.16px (at 8mm focal length, 4x binning -> 3mm/px).
+	 * With the linear formula this equates to 0.0125rad per frame.
+	 * Accumulated value in rad is thus 40 * 0.0125 = 5rad. Error: 8%.
+	 * At half the speed the error is just 2%. */
 	ctx->last.flow_x_rad   =   pixel_flow_y * rad_per_pixel;
 	ctx->last.flow_y_rad   = - pixel_flow_x * rad_per_pixel;
 	ctx->last.ground_distance = distance_valid ? ground_distance : -1;
@@ -94,6 +108,18 @@ void result_accumulator_feed(result_accumulator_ctx *ctx, float dt, float x_rate
 			ctx->m_flow_y_accu += ctx->last.flow_y_m; 
 			ctx->valid_dist_time += dt;
 		}
+	}
+	if (ctx->data_count > 0) {
+		/* accumulate the minimum value: */
+		if (ctx->last.flow_cap_mvx_rad < ctx->flow_cap_mvx_rad) {
+			ctx->flow_cap_mvx_rad = ctx->last.flow_cap_mvx_rad;
+		}
+		if (ctx->last.flow_cap_mvy_rad < ctx->flow_cap_mvy_rad) {
+			ctx->flow_cap_mvy_rad = ctx->last.flow_cap_mvy_rad;
+		}
+	} else {
+		ctx->flow_cap_mvx_rad = ctx->last.flow_cap_mvx_rad;
+		ctx->flow_cap_mvy_rad = ctx->last.flow_cap_mvy_rad;
 	}
 	ctx->data_count++;
 	ctx->frame_count++;

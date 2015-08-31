@@ -37,6 +37,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "flow.h"
 
 typedef struct _result_accumulator_ctx {
 	struct _last {
@@ -49,6 +50,9 @@ typedef struct _result_accumulator_ctx {
 		uint8_t qual;				///< The quality output of the flow algorithm.
 		float pixel_flow_x;			///< The measured x-flow in the current image in pixel. Sensor linear motion along the positive X axis induces a negative flow.
 		float pixel_flow_y;			///< The measured y-flow in the current image in pixel. Sensor linear motion along the positive Y axis induces a negative flow.
+		flow_capability flow_cap;	///< The flow capability.
+		float flow_cap_mvx_rad;		///< The maximum velocity the last flow result could measure. In rad / s. (x-direction)
+		float flow_cap_mvy_rad;		///< The maximum velocity the last flow result could measure. In rad / s. (y-direction)
 		float flow_x_rad;			///< Flow in radians around X axis (Sensor RH rotation about the X axis induces a positive flow. Sensor linear motion along the positive Y axis induces a negative flow.)
 		float flow_y_rad;			///< Flow in radians around Y axis (Sensor RH rotation about the Y axis induces a positive flow. Sensor linear motion along the positive X axis induces a positive flow.)
 		float flow_x_m;				///< The measured x-flow in the current image in meters.
@@ -63,6 +67,10 @@ typedef struct _result_accumulator_ctx {
 	float rad_flow_y_accu;
 	float m_flow_x_accu;
 	float m_flow_y_accu;
+	float flow_cap_mvx_rad;			/**< The maximum velocity that could be measured by all datasets together in one accumulation period. 
+									 *   This is the minimum of all max velocities. In rad / s. */
+	float flow_cap_mvy_rad;			/**< The maximum velocity that could be measured by all datasets together in one accumulation period. 
+									 *   This is the minimum of all max velocities. In rad / s. */
 	uint8_t min_quality;
 	uint16_t data_count;
 	uint16_t valid_data_count;
@@ -136,7 +144,7 @@ void result_accumulator_init(result_accumulator_ctx *ctx);
  *	@param distance_age Age of the distance measurement in us.
  */
 void result_accumulator_feed(result_accumulator_ctx *ctx, float dt, float x_rate, float y_rate, float z_rate, int16_t gyro_temp,
-							 uint8_t qual, float pixel_flow_x, float pixel_flow_y, float rad_per_pixel,
+							 uint8_t qual, float pixel_flow_x, float pixel_flow_y, const flow_capability *flow_cap, float rad_per_pixel,
 							 bool distance_valid, float ground_distance, uint32_t distance_age);
 
 /**	Recalculates the output values of the result_accumulator. Call this before using any of the output values.
