@@ -531,6 +531,33 @@ int main(void)
 			mavlink_msg_debug_vect_send(MAVLINK_COMM_2, "MAXVEL", get_boot_time_us(), 
 					mavlink_accumulator.flow_cap_mvx_rad, mavlink_accumulator.flow_cap_mvy_rad, frame_dt);
 			
+			// calculate RMS:
+			{
+				uint8_t *img = frames[0]->buffer;
+				//int i;
+				//int size = (int)frames[0]->param.p.size.x * (int)frames[0]->param.p.size.y;
+				float avg = 0;
+				int x, y;
+				int sx = frames[0]->param.p.size.x;
+				for (y = 16; y < 48; y++) {
+					for (x = 16; x < 48; x++) {
+						avg += img[x + sx * y];
+					}
+				}
+				avg = avg / (float)(32 * 32);
+				float rms = 0;
+				for (y = 16; y < 48; y++) {
+					for (x = 16; x < 48; x++) {
+						float d = ((float)img[x + sx * y] - avg);
+						rms += d * d;
+					}
+				}
+				rms = sqrt(rms / (float)(32 * 32));
+				
+				mavlink_msg_debug_vect_send(MAVLINK_COMM_2, "RMS", get_boot_time_us(), 
+					rms, avg, 0);
+			}
+			
 			// send flow
 			mavlink_msg_optical_flow_send(MAVLINK_COMM_0, get_boot_time_us(), global_data.param[PARAM_SENSOR_ID],
 					output_flow.flow_x, output_flow.flow_y,
