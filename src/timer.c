@@ -166,6 +166,8 @@ void timer_init(void)
 		LEDOn(LED_ERR);
 		while (1);
 	}
+	/* set highest priority: */
+	NVIC_SetPriority(SysTick_IRQn, 0);
 }
 
 uint32_t get_boot_time_ms(void)

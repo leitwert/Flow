@@ -292,6 +292,7 @@ void camera_transport_transfer_done_fn(void *usr, const void *buffer, size_t siz
 		}
 	} else {
 		// no frame currently as the target frame. it must be the beginning of a new frame then!
+		volatile uint32_t fr_timestamp = get_boot_time_us();
 		// update the sensor: (this might trigger some I2C transfers)
 		ctx->sensor->notify_readout_start(ctx->sensor->usr);
 		// get current sensor parameter:
@@ -333,7 +334,7 @@ void camera_transport_transfer_done_fn(void *usr, const void *buffer, size_t siz
 		}
 		// initialize the target buffer:
 		if (ctx->cur_frame_target_buf != NULL) {
-			ctx->cur_frame_target_buf->timestamp    = get_boot_time_us();
+			ctx->cur_frame_target_buf->timestamp    = fr_timestamp;
 			ctx->cur_frame_target_buf->frame_number = ctx->cur_frame_number;
 			ctx->cur_frame_target_buf->param        = ctx->cur_frame_param;
 			// write data to it: (at position 0)
