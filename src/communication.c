@@ -51,6 +51,7 @@
 extern void systemreset(bool to_bootloader);
 
 extern void notify_changed_camera_parameters();
+extern void notify_changed_image_parameters();
 
 mavlink_system_t mavlink_system;
 
@@ -239,6 +240,10 @@ void handle_mavlink_message(mavlink_channel_t chan,
 							if(i == PARAM_IMAGE_LOW_LIGHT || i == PARAM_IMAGE_ROW_NOISE_CORR || i == PARAM_IMAGE_TEST_PATTERN)
 							{
 								notify_changed_camera_parameters();
+							}
+							else if(i == PARAM_IMAGE_BINNING)
+							{
+								notify_changed_image_parameters();
 							}
 							/* handle calibration on/off */
 							else if(i == PARAM_VIDEO_ONLY)

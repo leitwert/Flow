@@ -118,6 +118,10 @@ void global_data_reset_param_defaults(void){
 	strcpy(global_data.param_name[PARAM_IMAGE_INTERVAL], "IMAGE_INTERVAL");
 	global_data.param_access[PARAM_IMAGE_INTERVAL] = READ_WRITE;
 
+	global_data.param[PARAM_IMAGE_BINNING] = 4;
+	strcpy(global_data.param_name[PARAM_IMAGE_BINNING], "IMAGE_BINNING");
+	global_data.param_access[PARAM_IMAGE_BINNING] = READ_WRITE;
+
 
 	global_data.param[PARAM_ALGORITHM_CHOICE] = 1;
 	strcpy(global_data.param_name[PARAM_ALGORITHM_CHOICE], "ALG_CHOICE");

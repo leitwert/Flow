@@ -192,6 +192,17 @@ void notify_changed_camera_parameters() {
 	camera_reconfigure_general(&cam_ctx);
 }
 
+void notify_changed_image_parameters() {
+	uint16_t bin = global_data.param[PARAM_IMAGE_BINNING];
+	switch (bin) {
+		case 1:
+		case 2:
+		case 4: img_stream_param.binning = bin; break;
+		default: return;
+	}
+	camera_img_stream_schedule_param_change(&cam_ctx, &img_stream_param);
+}
+
 #define FLOW_IMAGE_SIZE (64)
 
 static uint8_t image_buffer_8bit_1[FLOW_IMAGE_SIZE * FLOW_IMAGE_SIZE] __attribute__((section(".ccm")));
@@ -241,7 +252,7 @@ int main(void)
 	/* initialize camera: */
 	img_stream_param.size.x = FLOW_IMAGE_SIZE;
 	img_stream_param.size.y = FLOW_IMAGE_SIZE;
-	img_stream_param.binning = 4;
+	img_stream_param.binning = (uint16_t)global_data.param[PARAM_IMAGE_BINNING];
 	{
 		camera_image_buffer buffers[5] = {
 			BuildCameraImageBuffer(image_buffer_8bit_1),
@@ -517,6 +528,9 @@ int main(void)
 			result_accumulator_calculate_output_flow(&mavlink_accumulator, min_valid_ratio, &output_flow);
 			result_accumulator_calculate_output_flow_rad(&mavlink_accumulator, min_valid_ratio, &output_flow_rad);
 
+			mavlink_msg_debug_vect_send(MAVLINK_COMM_2, "MAXVEL", get_boot_time_us(), 
+					mavlink_accumulator.flow_cap_mvx_rad, mavlink_accumulator.flow_cap_mvy_rad, frame_dt);
+			
 			// send flow
 			mavlink_msg_optical_flow_send(MAVLINK_COMM_0, get_boot_time_us(), global_data.param[PARAM_SENSOR_ID],
 					output_flow.flow_x, output_flow.flow_y,
