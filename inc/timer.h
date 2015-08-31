@@ -63,10 +63,12 @@ void timer_check(void);
 void delay(uint16_t ms);
 
 /** Returns the number of milliseconds since booting.
+ *  @warning: can only be used from interrupt handlers with LOWER priority than priority 0. (priority > 0)
  */
 uint32_t get_boot_time_ms(void);
 
 /** Returns the number of microseconds since booting.
+ *  @warning: can only be used from interrupt handlers with LOWER priority than priority 0. (priority > 0)
  */
 uint32_t get_boot_time_us(void);
 
