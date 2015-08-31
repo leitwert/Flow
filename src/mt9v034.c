@@ -263,7 +263,7 @@ bool mt9v034_update_exposure_param(void *usr, uint32_t exposure, float gain) {
 	 * [6:0] Analog Gain:		Range 16 - 64
 	 *  [15] Force 0.75X:       0 = Disabled.
      */
-	uint16_t analog_gain = gain * 16;
+	uint16_t analog_gain = gain * 16.0f + 0.5f;
 	/* limit: */
 	if (analog_gain < 16) {
 		analog_gain = 16;
@@ -653,7 +653,7 @@ static bool mt9v034_configure_context(mt9v034_sensor_ctx *ctx, int context_idx, 
 	 * [6:0] Analog Gain:		Range 16 - 64
 	 *  [15] Force 0.75X:       0 = Disabled.
      */
-	uint16_t analog_gain = img_param->analog_gain * 16 + 0.5;
+	uint16_t analog_gain = img_param->analog_gain * 16.0f + 0.5f;
 	/* limit: */
 	if (analog_gain < 16) {
 		analog_gain = 16;
