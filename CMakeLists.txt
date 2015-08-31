@@ -210,7 +210,7 @@ set(PX4FLOW_HDRS
     )
 
 set(PX4FLOW_SRC
-    inc/camera.c
+    src/camera.c
     src/communication.c
     src/dcmi.c
     src/debug.c
