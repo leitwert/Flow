@@ -303,9 +303,24 @@ int main(void)
 	
 	uint32_t last_frame_index = 0;
 	
+	uint32_t last_loop_end = 0;
+	
 	/* main loop */
 	while (1)
 	{
+		uint32_t ts_loop_start;
+		uint32_t ts_gyro_and_dist;
+		uint32_t ts_get_image;
+		uint32_t ts_frame;
+		uint32_t ts_preparation;
+		uint32_t ts_computation;
+		uint32_t ts_result_extract;
+		uint32_t ts_result_accu;
+		uint32_t ts_finished;
+		uint32_t ts_loop_end;
+		
+		ts_loop_start = get_boot_time_us();
+		
 		/* check timers */
 		timer_check();
 		
@@ -320,6 +335,8 @@ int main(void)
 			}
 		}
 
+		ts_gyro_and_dist = get_boot_time_us();
+		
 		/* new gyroscope data */
 		float x_rate_sensor, y_rate_sensor, z_rate_sensor;
 		int16_t gyro_temp;
@@ -340,17 +357,19 @@ int main(void)
 
 		bool use_klt = global_data.param[PARAM_ALGORITHM_CHOICE] != 0;
 
-		uint32_t start_computations = 0;
+		ts_get_image = get_boot_time_us();
 		
 		/* get recent images */
 		camera_image_buffer *frames[2];
 		camera_img_stream_get_buffers(&cam_ctx, frames, 2, true);
 		
-		start_computations = get_boot_time_us();
+		ts_preparation = get_boot_time_us();
 		
 		int frame_delta = ((int32_t)frames[0]->frame_number - (int32_t)last_frame_index);
 		last_frame_index = frames[0]->frame_number;
 		fps_skipped_counter += frame_delta - 1;
+		
+		ts_frame = frames[0]->timestamp;
 		
 		flow_klt_image *klt_images[2] = {NULL, NULL};
 		{
@@ -407,9 +426,12 @@ int main(void)
 		const float focal_length_px = (global_data.param[PARAM_FOCAL_LENGTH_MM]) / 
 									  ((float)frames[0]->param.p.binning * 0.006f);	// pixel-size: 6um
 		
+		ts_computation = get_boot_time_us();
+		
 		/* extract the raw flow from the images: */
 		flow_raw_result flow_rslt[32];
 		uint16_t flow_rslt_count = 0;
+		float flow_iter_count = 0;
 		/* make sure both images are taken with same binning mode: */
 		if (frames[0]->param.p.binning == frames[1]->param.p.binning) {
 			/* compute gyro rate in pixels and change to image coordinates */
@@ -421,9 +443,11 @@ int main(void)
 			if (!use_klt) {
 				flow_rslt_count = compute_flow(frames[1]->buffer, frames[0]->buffer, x_rate_px, y_rate_px, z_rate_fr, 
 											   flow_rslt, sizeof(flow_rslt) / sizeof(flow_rslt[0]));
+				flow_iter_count = flow_rslt_count;
 			} else {
 				flow_rslt_count =  compute_klt(klt_images[1], klt_images[0],         x_rate_px, y_rate_px, z_rate_fr, 
 											   flow_rslt, sizeof(flow_rslt) / sizeof(flow_rslt[0]));
+				flow_iter_count = flow_rslt[sizeof(flow_rslt) / sizeof(flow_rslt[0]) - 1].quality;
 			}
 		} else {
 			/* no result for this frame. */
@@ -436,7 +460,9 @@ int main(void)
 		} else {
 			get_flow_klt_capability(&flow_rslt_cap);
 		}
-
+		
+		ts_result_extract = get_boot_time_us();
+		
 		/* calculate flow value from the raw results */
 		float pixel_flow_x;
 		float pixel_flow_y;
@@ -474,6 +500,8 @@ int main(void)
 		/* return the image buffers */
 		camera_img_stream_return_buffers(&cam_ctx, frames, 2);
 		
+		ts_result_accu = get_boot_time_us();
+		
 		/* decide which distance to use */
 		float ground_distance = 0.0f;
 
@@ -498,8 +526,8 @@ int main(void)
 								qual, pixel_flow_x, pixel_flow_y, &flow_rslt_cap, 1.0f / focal_length_px, 
 								distance_valid, ground_distance, get_time_delta_us(get_sonar_measure_time()));
 
-		uint32_t computaiton_time_us = get_time_delta_us(start_computations);
-
+		ts_finished = get_boot_time_us();
+		
 		counter++;
 		fps_counter++;
 
@@ -516,8 +544,9 @@ int main(void)
 				fps_counter = 0;
 				fps_skipped_counter = 0;
 
-				mavlink_msg_debug_vect_send(MAVLINK_COMM_2, "TIMING", get_boot_time_us(), computaiton_time_us, fps, fps_skip);
+				mavlink_msg_debug_vect_send(MAVLINK_COMM_2, "TIMING", get_boot_time_us(), calculate_time_delta_us(ts_finished, ts_preparation), fps, fps_skip);
 			}
+			
 			mavlink_msg_debug_vect_send(MAVLINK_COMM_2, "EXPOSURE", get_boot_time_us(), 
 					frames[0]->param.exposure, frames[0]->param.analog_gain, cam_ctx.last_brightness);
 			
@@ -599,5 +628,36 @@ int main(void)
 		{
 			communication_receive_forward();
 		}
+		
+		ts_loop_end = get_boot_time_us();
+		
+		/*uint32_t ts_loop_start;
+		uint32_t ts_gyro_and_dist;
+		uint32_t ts_get_image;
+		uint32_t ts_frame;
+		uint32_t ts_preparation;
+		uint32_t ts_computation;
+		uint32_t ts_result_extract;
+		uint32_t ts_result_accu;
+		uint32_t ts_finished;
+		uint32_t ts_loop_end;*/
+		mavlink_msg_debug_vect_send(MAVLINK_COMM_2, "T1", get_boot_time_us(),
+				calculate_time_delta_us(ts_gyro_and_dist, ts_loop_start), 
+				calculate_time_delta_us(ts_get_image, ts_gyro_and_dist), 
+				calculate_time_delta_us(ts_preparation, ts_get_image));
+		mavlink_msg_debug_vect_send(MAVLINK_COMM_2, "T2", get_boot_time_us(), 
+				calculate_time_delta_us(ts_preparation, ts_frame),
+				calculate_time_delta_us(ts_computation, ts_preparation), 
+				calculate_time_delta_us(ts_result_extract, ts_computation));
+		mavlink_msg_debug_vect_send(MAVLINK_COMM_2, "T3", get_boot_time_us(), 
+				calculate_time_delta_us(ts_result_accu, ts_result_extract), 
+				calculate_time_delta_us(ts_finished, ts_result_accu), 
+				calculate_time_delta_us(ts_loop_end, ts_finished));
+		mavlink_msg_debug_vect_send(MAVLINK_COMM_2, "T4", get_boot_time_us(), 
+				frame_delta, 
+				flow_iter_count, 
+				calculate_time_delta_us(ts_loop_start, last_loop_end));
+		
+		last_loop_end = ts_loop_end;
 	}
 }

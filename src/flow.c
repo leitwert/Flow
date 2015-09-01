@@ -564,6 +564,8 @@ uint16_t compute_klt(flow_klt_image *image1, flow_klt_image *image2, float x_rat
 
 	uint16_t max_iters = global_data.param[PARAM_KLT_MAX_ITERS];
 
+	uint16_t iter_count = 0;
+	
 	/*
 	 * compute image pyramid for current frame
 	 * there is 188*120 bytes per buffer, we are only using 64*64 per buffer,
@@ -709,6 +711,8 @@ uint16_t compute_klt(flow_klt_image *image1, flow_klt_image *image2, float x_rat
 				//Now do some Gauss-Newton iterations for flow
 				for (int iters = 0; iters < max_iters; iters++)
 				{
+					iter_count++;
+					
 					float JTe_x = 0;  //accumulators for Jac transposed times error
 					float JTe_y = 0;
 
@@ -800,6 +804,7 @@ uint16_t compute_klt(flow_klt_image *image1, flow_klt_image *image2, float x_rat
 			}
 		}
 	}
+	out[max_out - 1].quality = iter_count;
 	return NUM_BLOCK_KLT * NUM_BLOCK_KLT < max_out ? NUM_BLOCK_KLT * NUM_BLOCK_KLT : max_out;
 }
 
