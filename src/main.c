@@ -262,7 +262,7 @@ int main(void)
 			BuildCameraImageBuffer(image_buffer_8bit_5)
 		};
 		camera_init(&cam_ctx, mt9v034_get_sensor_interface(), dcmi_get_transport_interface(), 
-					mt9v034_get_clks_per_row(64, 4) * 1, mt9v034_get_clks_per_row(64, 4) * 64, 2.0,
+					mt9v034_get_clks_per_row(64, 4) * 1, mt9v034_get_clks_per_row(64, 4) * 64, 4.0,
 					&img_stream_param, buffers, 5);
 	}
 
@@ -432,6 +432,7 @@ int main(void)
 		flow_raw_result flow_rslt[32];
 		uint16_t flow_rslt_count = 0;
 		float flow_iter_count = 0;
+		float flow_real_comp_t = 0;
 		/* make sure both images are taken with same binning mode: */
 		if (frames[0]->param.p.binning == frames[1]->param.p.binning) {
 			/* compute gyro rate in pixels and change to image coordinates */
@@ -447,7 +448,10 @@ int main(void)
 			} else {
 				flow_rslt_count =  compute_klt(klt_images[1], klt_images[0],         x_rate_px, y_rate_px, z_rate_fr, 
 											   flow_rslt, sizeof(flow_rslt) / sizeof(flow_rslt[0]));
-				flow_iter_count = flow_rslt[sizeof(flow_rslt) / sizeof(flow_rslt[0]) - 1].quality;
+				if (flow_rslt_count > 0) {
+					flow_iter_count = flow_rslt[sizeof(flow_rslt) / sizeof(flow_rslt[0]) - 1].quality;
+					flow_real_comp_t = flow_rslt[sizeof(flow_rslt) / sizeof(flow_rslt[0]) - 1].x;
+				}
 			}
 		} else {
 			/* no result for this frame. */
@@ -557,6 +561,31 @@ int main(void)
 			result_accumulator_calculate_output_flow(&mavlink_accumulator, min_valid_ratio, &output_flow);
 			result_accumulator_calculate_output_flow_rad(&mavlink_accumulator, min_valid_ratio, &output_flow_rad);
 
+			static double flow_var_e_x2 = 0;
+			static double flow_var_e_x = 0;
+			static double flow_var_e_y2 = 0;
+			static double flow_var_e_y = 0;
+			if (output_flow_rad.integration_time > 0) {
+				const double k = 0.95;
+
+				float flow_x = output_flow_rad.integrated_x / (output_flow_rad.integration_time * 1e-6f);
+				float flow_y = output_flow_rad.integrated_y / (output_flow_rad.integration_time * 1e-6f);
+
+				flow_var_e_x  = k * flow_var_e_x  + (1.0 - k) *  flow_x;
+				flow_var_e_x2 = k * flow_var_e_x2 + (1.0 - k) * (flow_x * flow_x);
+
+				flow_var_e_y  = k * flow_var_e_y  + (1.0 - k) *  flow_y;
+				flow_var_e_y2 = k * flow_var_e_y2 + (1.0 - k) * (flow_y * flow_y);
+
+				float var_x = flow_var_e_x2 - flow_var_e_x * flow_var_e_x;
+				float var_y = flow_var_e_y2 - flow_var_e_y * flow_var_e_y;
+				
+				mavlink_msg_debug_vect_send(MAVLINK_COMM_2, "VAR", get_boot_time_us(), 
+						sqrt(flow_x * flow_x + flow_y * flow_y), 
+						sqrt(flow_var_e_x * flow_var_e_x + flow_var_e_y * flow_var_e_y), 
+						sqrt(var_x + var_y));
+			}
+			
 			mavlink_msg_debug_vect_send(MAVLINK_COMM_2, "MAXVEL", get_boot_time_us(), 
 					mavlink_accumulator.flow_cap_mvx_rad, mavlink_accumulator.flow_cap_mvy_rad, frame_dt);
 			
@@ -648,7 +677,7 @@ int main(void)
 		mavlink_msg_debug_vect_send(MAVLINK_COMM_2, "T2", get_boot_time_us(), 
 				calculate_time_delta_us(ts_preparation, ts_frame),
 				calculate_time_delta_us(ts_computation, ts_preparation), 
-				calculate_time_delta_us(ts_result_extract, ts_computation));
+				/*flow_real_comp_t*/calculate_time_delta_us(ts_result_extract, ts_computation));
 		mavlink_msg_debug_vect_send(MAVLINK_COMM_2, "T3", get_boot_time_us(), 
 				calculate_time_delta_us(ts_result_accu, ts_result_extract), 
 				calculate_time_delta_us(ts_finished, ts_result_accu), 

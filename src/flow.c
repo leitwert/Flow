@@ -50,6 +50,7 @@
 #define __INLINE inline
 #define __ASM asm
 #include "core_cm4_simd.h"
+#include "core_cmFunc.h"
 
 #define SEARCH_SIZE	global_data.param[PARAM_FLOW_MAX_PIXEL] // maximum offset to search: 4 + 1/2 pixels
 #define TILE_SIZE	8               						// x & y tile size
@@ -643,7 +644,9 @@ uint16_t compute_klt(flow_klt_image *image1, flow_klt_image *image2, float x_rat
 			}
 		}
 	}
-
+	__disable_irq();
+	uint32_t t = 0;
+	volatile uint32_t ts = get_boot_time_us();
 	//for all pyramid levels, start from the smallest level
 	for (int l = PYR_LVLS-1; l >= 0; l--)
 	{
@@ -802,8 +805,19 @@ uint16_t compute_klt(flow_klt_image *image1, flow_klt_image *image2, float x_rat
 					}
 				}
 			}
+			volatile uint32_t ts2 = get_boot_time_us();
+			__enable_irq();
+			volatile uint32_t ts3 = get_boot_time_us();
+			if (((int32_t)ts3 - (int32_t)(ts2 + 1000)) > 0) {
+				ts2 += 1000;
+			}
+			t += ts2 - ts;
+			__disable_irq();
+			ts = get_boot_time_us();
 		}
 	}
+	__enable_irq();
+	out[max_out - 1].x = t;
 	out[max_out - 1].quality = iter_count;
 	return NUM_BLOCK_KLT * NUM_BLOCK_KLT < max_out ? NUM_BLOCK_KLT * NUM_BLOCK_KLT : max_out;
 }
