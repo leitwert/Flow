@@ -222,7 +222,8 @@ void I2C1_ER_IRQHandler(void) {
 	}
 }
 
-void update_TX_buffer(float dt, float x_rate, float y_rate, float z_rate, int16_t gyro_temp,
+void update_TX_buffer(float dt, float dropped_dt, 
+					  float x_rate, float y_rate, float z_rate, int16_t gyro_temp,
 					  uint8_t qual, float pixel_flow_x, float pixel_flow_y, float rad_per_pixel,
 					  bool distance_valid, float ground_distance, uint32_t distance_age) {
 	static result_accumulator_ctx accumulator;
@@ -240,7 +241,8 @@ void update_TX_buffer(float dt, float x_rate, float y_rate, float z_rate, int16_
 	}
 
 	/* feed the accumulator and recalculate */
-	result_accumulator_feed(&accumulator, dt, x_rate, y_rate, z_rate, gyro_temp,
+	result_accumulator_feed(&accumulator, dt, dropped_dt, 
+							x_rate, y_rate, z_rate, gyro_temp,
 							qual, pixel_flow_x, pixel_flow_y, rad_per_pixel, 
 							distance_valid, ground_distance, distance_age);
 

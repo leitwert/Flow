@@ -292,6 +292,8 @@ int main(void)
 	
 	uint32_t last_frame_index = 0;
 	
+	uint32_t last_processed_frame_timestamp = get_boot_time_us();
+	
 	/* main loop */
 	while (1)
 	{
@@ -393,8 +395,10 @@ int main(void)
 			}
 		}
 		
-		float frame_dt = (frames[0]->timestamp - frames[1]->timestamp) * 0.000001f;
-
+		float frame_dt   = calculate_time_delta_us(frames[0]->timestamp, frames[1]->timestamp)           * 0.000001f;
+		float dropped_dt = calculate_time_delta_us(frames[1]->timestamp, last_processed_frame_timestamp) * 0.000001f;
+		last_processed_frame_timestamp = frames[0]->timestamp;
+		
 		/* compute gyro rate in pixels and change to image coordinates */
 		float x_rate_px = - y_rate * (focal_length_px * frame_dt);
 		float y_rate_px =   x_rate * (focal_length_px * frame_dt);
@@ -459,13 +463,13 @@ int main(void)
 		}
 
 		/* update I2C transmit buffer */
-		update_TX_buffer(frame_dt, 
+		update_TX_buffer(frame_dt, dropped_dt, 
 						 x_rate, y_rate, z_rate, gyro_temp, 
 						 qual, pixel_flow_x, pixel_flow_y, 1.0f / focal_length_px, 
 						 distance_valid, ground_distance, get_time_delta_us(get_sonar_measure_time()));
 
 		/* accumulate the results */
-		result_accumulator_feed(&mavlink_accumulator, frame_dt, 
+		result_accumulator_feed(&mavlink_accumulator, frame_dt, dropped_dt, 
 								x_rate, y_rate, z_rate, gyro_temp, 
 								qual, pixel_flow_x, pixel_flow_y, 1.0f / focal_length_px, 
 								distance_valid, ground_distance, get_time_delta_us(get_sonar_measure_time()));

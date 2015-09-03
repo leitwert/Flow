@@ -49,7 +49,8 @@
  */
 
 void i2c_init(void);
-void update_TX_buffer(float dt, float x_rate, float y_rate, float z_rate, int16_t gyro_temp,
+void update_TX_buffer(float dt, float dropped_dt, 
+					  float x_rate, float y_rate, float z_rate, int16_t gyro_temp,
 					  uint8_t qual, float pixel_flow_x, float pixel_flow_y, float rad_per_pixel,
 					  bool distance_valid, float ground_distance, uint32_t distance_age);
 char i2c_get_ownaddress1(void);

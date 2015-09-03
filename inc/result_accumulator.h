@@ -42,6 +42,7 @@ typedef struct _result_accumulator_ctx {
 	struct _last {
 		uint32_t frame_count;		///< Frame counter.
 		float dt;					///< The time delta of this sample.
+		float dropped_dt;			///< The time delta of samples that have been dropped before this sample.
 		float x_rate;				///< The current x_rate of the gyro in rad / sec. (Image/Flow coordinates)
 		float y_rate;				///< The current y_rate of the gyro in rad / sec. (Image/Flow coordinates)
 		float z_rate;				///< The current z_rate of the gyro in rad / sec. (Image/Flow coordinates)
@@ -56,22 +57,22 @@ typedef struct _result_accumulator_ctx {
 		float ground_distance;		///< The measured distance to the ground in meter.
 		uint32_t distance_age;		///< Age of the distance measurement in us.
 	} last;
-	uint32_t frame_count;
-	float px_flow_x_accu;
-	float px_flow_y_accu;
-	float rad_flow_x_accu;
-	float rad_flow_y_accu;
-	float m_flow_x_accu;
-	float m_flow_y_accu;
-	uint8_t min_quality;
-	uint16_t data_count;
-	uint16_t valid_data_count;
-	float valid_dist_time;
-	float valid_time;
-	float full_time;
-	float gyro_x_accu;
-	float gyro_y_accu;
-	float gyro_z_accu;
+	uint32_t frame_count;			///< Frame counter which increases with each sample that has been fed to the accumulator.
+	float px_flow_x_accu;			///< Pixel flow accumulator (x-direction).
+	float px_flow_y_accu;			///< Pixel flow accumulator (y-direction).
+	float rad_flow_x_accu;			///< Radiant flow accumulator (x-axis).
+	float rad_flow_y_accu;			///< Radiant flow accumulator (y-axis).
+	float m_flow_x_accu;			///< Flow in meter accumulator (x-axis).
+	float m_flow_y_accu;			///< Flow in meter accumulator (y-axis).
+	uint8_t min_quality;			///< Minimum of all non-zero quality measurements in the current accumulation period.
+	uint16_t data_count;			///< Number of samples of the current accumulation period.
+	uint16_t valid_data_count;		///< Number of samples with quality > 0.
+	float valid_dist_time;			///< Accumulated sample time with valid distance and quality > 0.
+	float valid_time;				///< Accumulated sample time with quality > 0.
+	float full_time;				///< Accumulated sample time including the dropped delta time.
+	float gyro_x_accu;				///< X-Gyro accumulator.
+	float gyro_y_accu;				///< Y-Gyro accumulator.
+	float gyro_z_accu;				///< Z-Gyro accumulator.
 } result_accumulator_ctx;
 
 
@@ -123,6 +124,7 @@ void result_accumulator_init(result_accumulator_ctx *ctx);
 /**	Feeds the result accumulator with new data. It will take care of handling invalid data.
  *	@param ctx The result accumulator context to use.
  *	@param dt  The time delta of this sample.
+ *  @param dropped_dt The time delta of samples that have been dropped before this sample.
  *	@param x_rate The current x_rate of the gyro in rad / sec. (flow sensor coordinates)
  *	@param y_rate The current y_rate of the gyro in rad / sec. (flow sensor coordinates)
  *	@param z_rate The current z_rate of the gyro in rad / sec. (flow sensor coordinates)
@@ -135,7 +137,8 @@ void result_accumulator_init(result_accumulator_ctx *ctx);
  *	@param ground_distance The measured distance to the ground in meter.
  *	@param distance_age Age of the distance measurement in us.
  */
-void result_accumulator_feed(result_accumulator_ctx *ctx, float dt, float x_rate, float y_rate, float z_rate, int16_t gyro_temp,
+void result_accumulator_feed(result_accumulator_ctx *ctx, float dt, float dropped_dt, 
+							 float x_rate, float y_rate, float z_rate, int16_t gyro_temp,
 							 uint8_t qual, float pixel_flow_x, float pixel_flow_y, float rad_per_pixel,
 							 bool distance_valid, float ground_distance, uint32_t distance_age);
 

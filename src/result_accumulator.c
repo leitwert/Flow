@@ -49,12 +49,14 @@ void result_accumulator_init(result_accumulator_ctx *ctx)
 	ctx->last.ground_distance = -1;
 }
 
-void result_accumulator_feed(result_accumulator_ctx *ctx, float dt, float x_rate, float y_rate, float z_rate, int16_t gyro_temp, 
+void result_accumulator_feed(result_accumulator_ctx *ctx, float dt, float dropped_dt, 
+							 float x_rate, float y_rate, float z_rate, int16_t gyro_temp, 
 							 uint8_t qual, float pixel_flow_x, float pixel_flow_y, float rad_per_pixel,
 							 bool distance_valid, float ground_distance, uint32_t distance_age)
 {
 	/* update last value in struct */
 	ctx->last.dt = dt;
+	ctx->last.dropped_dt = dropped_dt;
 	ctx->last.x_rate = x_rate;
 	ctx->last.y_rate = y_rate;
 	ctx->last.z_rate = z_rate;
@@ -98,6 +100,7 @@ void result_accumulator_feed(result_accumulator_ctx *ctx, float dt, float x_rate
 	ctx->data_count++;
 	ctx->frame_count++;
 	ctx->full_time += dt;
+	ctx->full_time += ctx->last.dropped_dt;
 
 	ctx->last.frame_count = ctx->frame_count;
 }
