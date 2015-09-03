@@ -432,8 +432,8 @@ int main(void)
 		/* extract the raw flow from the images: */
 		flow_raw_result flow_rslt[32];
 		uint16_t flow_rslt_count = 0;
-		float flow_iter_count = 0;
-		float flow_real_comp_t = 0;
+		float flow_iter_count __attribute__((unused)) = 0;
+		float flow_real_comp_t __attribute__((unused)) = 0;
 		/* make sure both images are taken with same binning mode: */
 		if (frames[0]->param.p.binning == frames[1]->param.p.binning) {
 			/* compute gyro rate in pixels and change to image coordinates */
