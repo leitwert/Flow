@@ -203,8 +203,8 @@ bool mt9v034_update_exposure_param(void *usr, uint32_t exposure, float gain) {
 		return false;
 	}
 	
-	bool update_exposure;
-	bool update_gain;
+	bool update_exposure = false;
+	bool update_gain     = false;
 	int context_idx;
 	if (ctx->do_switch_context) {
 		context_idx = ctx->desired_context;
